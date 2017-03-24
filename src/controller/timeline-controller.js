@@ -1,6 +1,6 @@
 /*
  * Timeline Controller
-*/
+ */
 
 import Event from '../events';
 import EventHandler from '../event-handler';
@@ -28,13 +28,13 @@ class TimelineController extends EventHandler {
 
   constructor(hls) {
     super(hls, Event.MEDIA_ATTACHING,
-                Event.MEDIA_DETACHING,
-                Event.FRAG_PARSING_USERDATA,
-                Event.MANIFEST_LOADING,
-                Event.MANIFEST_LOADED,
-                Event.FRAG_LOADED,
-                Event.LEVEL_SWITCHING,
-                Event.INIT_PTS_FOUND);
+      Event.MEDIA_DETACHING,
+      Event.FRAG_PARSING_USERDATA,
+      Event.MANIFEST_LOADING,
+      Event.MANIFEST_LOADED,
+      Event.FRAG_LOADED,
+      Event.LEVEL_SWITCHING,
+      Event.INIT_PTS_FOUND);
 
     this.hls = hls;
     this.config = hls.config;
@@ -226,7 +226,7 @@ class TimelineController extends EventHandler {
 
       this.tracks.forEach((track, index) => {
         let textTrack;
-        const inUseTrack = inUseTracks[index];
+        const inUseTrack = inUseTracks.length > index && inUseTracks[index];
         // Reuse tracks with the same label, but do not reuse 608/708 tracks
         if (reuseVttTextTrack(inUseTrack, track)) {
           textTrack = inUseTrack;
