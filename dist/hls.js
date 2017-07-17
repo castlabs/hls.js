@@ -5753,7 +5753,7 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; } /*
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 * Timeline Controller
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               */
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                */
 
 function clearCurrentCues(track) {
   if (track && track.cues) {
@@ -10529,7 +10529,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.7.11-0';
+      return '0.7.11-1';
     }
   }, {
     key: 'Events',
@@ -15640,7 +15640,7 @@ function parseOptions(input, callback, keyValueDelim, groupDelim) {
   }
 }
 
-var defaults = new _vttcue2.default(0, 0, 0);
+var defaults = new _vttcue2.default(0, 10000000, 0);
 // 'middle' was changed to 'center' in the spec: https://github.com/w3c/webvtt/pull/244
 // Chrome and Safari don't yet support this change, but FF does
 var center = defaults.align === 'middle' ? 'middle' : 'center';
@@ -15855,7 +15855,7 @@ VTTParser.prototype = {
             if (!line) {
               continue;
             }
-            self.cue = new _vttcue2.default(0, 0, '');
+            self.cue = new _vttcue2.default(0, 10000000, '');
             self.state = 'CUE';
             // 30-39 - Check if self line contains an optional identifier or timing data.
             if (line.indexOf('-->') === -1) {
