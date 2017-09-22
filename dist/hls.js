@@ -1862,18 +1862,20 @@ var aacdemuxer_AACDemuxer = function () {
   AACDemuxer.prototype.resetTimeStamp = function resetTimeStamp() {};
 
   AACDemuxer.probe = function probe(data) {
-    // check if data contains ID3 timestamp and ADTS sync word
-    var offset, length;
-    var id3Data = id3["a" /* default */].getID3Data(data, 0);
-    if (id3Data && id3["a" /* default */].getTimeStamp(id3Data) !== undefined) {
-      // Look for ADTS header | 1111 1111 | 1111 X00X | where X can be either 0 or 1
-      // Layer bits (position 14 and 15) in header should be always 0 for ADTS
-      // More info https://wiki.multimedia.cx/index.php?title=ADTS
-      for (offset = id3Data.length, length = Math.min(data.length - 1, offset + 100); offset < length; offset++) {
-        if (adts_probe(data, offset)) {
-          logger["b" /* logger */].log('ADTS sync word found !');
-          return true;
-        }
+    if (!data) {
+      return false;
+    }
+    // Check for the ADTS sync word
+    // Look for ADTS header | 1111 1111 | 1111 X00X | where X can be either 0 or 1
+    // Layer bits (position 14 and 15) in header should be always 0 for ADTS
+    // More info https://wiki.multimedia.cx/index.php?title=ADTS
+    var id3Data = id3["a" /* default */].getID3Data(data, 0) || [];
+    var offset = id3Data.length;
+
+    for (var length = data.length; offset < length; offset++) {
+      if (adts_probe(data, offset)) {
+        logger["b" /* logger */].log('ADTS sync word found !');
+        return true;
       }
     }
     return false;
@@ -1883,13 +1885,14 @@ var aacdemuxer_AACDemuxer = function () {
 
 
   AACDemuxer.prototype.append = function append(data, timeOffset, contiguous, accurateTimeOffset) {
-    var track = this._audioTrack,
-        id3Data = id3["a" /* default */].getID3Data(data, 0),
-        pts = 90 * id3["a" /* default */].getTimeStamp(id3Data),
-        frameIndex = 0,
-        stamp = pts,
-        length = data.length,
-        offset = id3Data.length;
+    var track = this._audioTrack;
+    var id3Data = id3["a" /* default */].getID3Data(data, 0) || [];
+    var timestamp = id3["a" /* default */].getTimeStamp(id3Data);
+    var pts = timestamp ? 90 * timestamp : timeOffset * 90000;
+    var frameIndex = 0;
+    var stamp = pts;
+    var length = data.length;
+    var offset = id3Data.length;
 
     var id3Samples = [{ pts: stamp, dts: stamp, data: id3Data }];
 
@@ -2187,6 +2190,7 @@ var mp4demuxer_MP4Demuxer = function () {
             baseMediaDecodeTime *= Math.pow(2, 32);
             baseMediaDecodeTime += MP4Demuxer.readUint32(tfdt, 8);
             baseMediaDecodeTime -= timeOffset * timescale;
+            baseMediaDecodeTime = Math.max(baseMediaDecodeTime, 0);
             var upper = Math.floor(baseMediaDecodeTime / (UINT32_MAX + 1));
             var lower = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
             MP4Demuxer.writeUint32(tfdt, 4, upper);
@@ -5355,8 +5359,8 @@ var demuxer_inline_DemuxerInline = function () {
       var observer = this.observer;
       var typeSupported = this.typeSupported;
       var config = this.config;
-      // probing order is AAC/MP3/TS/MP4
-      var muxConfig = [{ demux: aacdemuxer, remux: mp4_remuxer }, { demux: mp3demuxer, remux: mp4_remuxer }, { demux: tsdemuxer, remux: mp4_remuxer }, { demux: mp4demuxer, remux: passthrough_remuxer }];
+      // probing order is TS/AAC/MP3/MP4
+      var muxConfig = [{ demux: tsdemuxer, remux: mp4_remuxer }, { demux: aacdemuxer, remux: mp4_remuxer }, { demux: mp3demuxer, remux: mp4_remuxer }, { demux: mp4demuxer, remux: passthrough_remuxer }];
 
       // probe for content type
       for (var i = 0, len = muxConfig.length; i < len; i++) {
@@ -7287,11 +7291,10 @@ var stream_controller_StreamController = function (_EventHandler) {
         config = hls.config,
         media = this.media;
 
-    // if video not attached AND
-    // start fragment already requested OR start frag prefetch disable
-    // exit loop
-    // => if start level loaded and media not attached but start frag prefetch is enabled and start frag not requested yet, we will not exit loop
-    if (this.levelLastLoaded !== undefined && !media && (this.startFragRequested || !config.startFragPrefetch)) {
+    // if start level not parsed yet OR
+    // if video not attached AND start fragment already requested OR start frag prefetch disable
+    // exit loop, as we either need more info (level not parsed) or we need media to be attached to load new fragment
+    if (this.levelLastLoaded === undefined || !media && (this.startFragRequested || !config.startFragPrefetch)) {
       return;
     }
 
@@ -7515,7 +7518,7 @@ var stream_controller_StreamController = function (_EventHandler) {
       //  return -1             return 0                 return 1
       //logger.log(`level/sn/start/end/bufEnd:${level}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
       // Set the lookup tolerance to be small enough to detect the current segment - ensures we don't skip over very small segments
-      var candidateLookupTolerance = Math.min(maxFragLookUpTolerance, candidate.duration);
+      var candidateLookupTolerance = Math.min(maxFragLookUpTolerance, candidate.duration + (candidate.deltaPTS ? candidate.deltaPTS : 0));
       if (candidate.start + candidate.duration - candidateLookupTolerance <= bufferEnd) {
         return 1;
       } // if maxFragLookUpTolerance will have negative value then don't return -1 for first element
@@ -7968,7 +7971,6 @@ var stream_controller_StreamController = function (_EventHandler) {
       logger["b" /* logger */].log('both AAC/HE-AAC audio found in levels; declaring level codec as HE-AAC');
     }
     this.levels = data.levels;
-    this.startLevelLoaded = false;
     this.startFragRequested = false;
     var config = this.config;
     if (config.autoStartLoad || this.forceStartLoad) {
@@ -8496,12 +8498,13 @@ var stream_controller_StreamController = function (_EventHandler) {
         // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
         var startPosition = media.seeking ? currentTime : this.startPosition,
             startPositionBuffered = buffer_helper.isBuffered(mediaBuffer, startPosition),
-            firstbufferedPosition = buffered.start(0);
-        // if currentTime not matching with expected startPosition or startPosition not buffered
-        if (currentTime !== startPosition || !startPositionBuffered && Math.abs(startPosition - firstbufferedPosition) < config.maxSeekHole) {
+            firstbufferedPosition = buffered.start(0),
+            startNotBufferedButClose = !startPositionBuffered && Math.abs(startPosition - firstbufferedPosition) < config.maxSeekHole;
+        // if currentTime not matching with expected startPosition or startPosition not buffered but close to first buffered
+        if (currentTime !== startPosition || startNotBufferedButClose) {
           logger["b" /* logger */].log('target start position:' + startPosition);
           // if startPosition not buffered, let's seek to buffered.start(0)
-          if (!startPositionBuffered) {
+          if (!startNotBufferedButClose) {
             startPosition = firstbufferedPosition;
             logger["b" /* logger */].log('target start position not buffered, seek to buffered.start(0) ' + startPosition);
           }
@@ -14208,30 +14211,56 @@ var timeline_controller_TimelineController = function (_EventHandler) {
           var textTracks = this.textTracks,
               hls = this.hls;
 
-          // Parse the WebVTT file contents.
-          webvtt_parser.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
-            var currentTrack = textTracks[frag.trackId];
-            // Add cues and trigger event with success true.
-            cues.forEach(function (cue) {
-              // Sometimes there are cue overlaps on segmented vtts so the same
-              // cue can appear more than once in different vtt files.
-              // This avoid showing duplicated cues with same timecode and text.
-              if (!currentTrack.cues.getCueById(cue.id)) {
-                try {
-                  currentTrack.addCue(cue);
-                } catch (err) {
-                  var textTrackCue = new window.TextTrackCue(cue.startTime, cue.endTime, cue.text);
-                  textTrackCue.id = cue.id;
-                  currentTrack.addCue(textTrackCue);
-                }
+          var header = String.fromCharCode.apply(null, new Uint8Array(payload).subarray(0, 200));
+          var ExternalTtmlTextParser = window.shaka && window.shaka.media && window.shaka.media.TtmlTextParser;
+          if (header.indexOf('<?xml') === 0 && header.indexOf('<tt') > 0 && ExternalTtmlTextParser) {
+            var ttmlCues = [];
+            try {
+              ttmlCues = new ExternalTtmlTextParser().parseMedia(payload, { periodStart: frag.start }, [frag.baseurl]);
+              if (ttmlCues.length) {
+                ttmlCues.forEach(function (cue) {
+                  var currentTrack = textTracks[frag.trackId];
+                  try {
+                    currentTrack.addCue(cue);
+                  } catch (err) {
+                    var textTrackCue = new window.TextTrackCue(cue.startTime, cue.endTime, cue.text);
+                    textTrackCue.id = cue.id;
+                    currentTrack.addCue(textTrackCue);
+                  }
+                });
               }
+              hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: true, frag: frag });
+            } catch (e) {
+              // Something went wrong while parsing. Trigger event with success false.
+              logger["b" /* logger */].log('Failed to parse TTML cue: ' + e);
+              hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: false, frag: frag });
+            }
+          } else {
+            // Parse the WebVTT file contents.
+            webvtt_parser.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
+              var currentTrack = textTracks[frag.trackId];
+              // Add cues and trigger event with success true.
+              cues.forEach(function (cue) {
+                // Sometimes there are cue overlaps on segmented vtts so the same
+                // cue can appear more than once in different vtt files.
+                // This avoid showing duplicated cues with same timecode and text.
+                if (!currentTrack.cues.getCueById(cue.id)) {
+                  try {
+                    currentTrack.addCue(cue);
+                  } catch (err) {
+                    var textTrackCue = new window.TextTrackCue(cue.startTime, cue.endTime, cue.text);
+                    textTrackCue.id = cue.id;
+                    currentTrack.addCue(textTrackCue);
+                  }
+                }
+              });
+              hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: true, frag: frag });
+            }, function (e) {
+              // Something went wrong while parsing. Trigger event with success false.
+              logger["b" /* logger */].log('Failed to parse VTT cue: ' + e);
+              hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: false, frag: frag });
             });
-            hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: true, frag: frag });
-          }, function (e) {
-            // Something went wrong while parsing. Trigger event with success false.
-            logger["b" /* logger */].log('Failed to parse VTT cue: ' + e);
-            hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: false, frag: frag });
-          });
+          }
         } else {
           // In case there is no payload, finish unsuccessfully.
           this.hls.trigger(events["a" /* default */].SUBTITLE_FRAG_PROCESSED, { success: false, frag: frag });
