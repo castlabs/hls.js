@@ -263,11 +263,24 @@ class TimelineController extends EventHandler {
     // If fragment is subtitle type, parse as WebVTT.
     else if (frag.type === 'subtitle') {
       if (payload.byteLength) {
-        // We need an initial synchronisation PTS. Store fragments as long as none has arrived.
+        var tagList = frag.tagList || [];
+        var element = tagList.find(function (tag) {
+          return tag.join(':').match(/^USP-X-TIMESTAMP-MAP\:/);
+        });
+        if (element) {
+          var tag = element.join(':');
+          var cueTimeMatch = tag && tag.match(/(?:LOCAL=)(.+)/);
+          cueTimeMatch = cueTimeMatch && cueTimeMatch[1];
+          cueTimeMatch = cueTimeMatch && new Date(cueTimeMatch).getTime();
+          cueTimeMatch = isNaN(cueTimeMatch) ? 0 : -cueTimeMatch / 1000;
+          this.cueTimeMatch = cueTimeMatch;
+        }
+
         if (typeof this.initPTS === 'undefined') {
           this.unparsedVttFrags.push(data);
           return;
         }
+
         let vttCCs = this.vttCCs;
         if (!vttCCs[frag.cc]) {
           vttCCs[frag.cc] = { start: frag.start, prevCC: this.prevCC, new: true };
@@ -276,12 +289,13 @@ class TimelineController extends EventHandler {
         let textTracks = this.textTracks,
           hls = this.hls;
 
-        var header = String.fromCharCode.apply(null, new Uint8Array(payload).subarray(0,200));
+        var header = String.fromCharCode.apply(null, new Uint8Array(payload).subarray(0, 200));
         var ExternalTtmlTextParser = window.shaka && window.shaka.media && window.shaka.media.TtmlTextParser;
+
         if (header.indexOf('<?xml') === 0 && header.indexOf('<tt') > 0 && ExternalTtmlTextParser) {
           var ttmlCues = [];
           try {
-            ttmlCues = new ExternalTtmlTextParser().parseMedia(payload, {periodStart: frag.start}, [frag.baseurl]);
+            ttmlCues = new ExternalTtmlTextParser().parseMedia(payload, {periodStart: this.cueTimeMatch}, [frag.baseurl]);
             if (ttmlCues.length){
               ttmlCues.forEach(function(cue){
                 const currentTrack = textTracks[frag.trackId];
