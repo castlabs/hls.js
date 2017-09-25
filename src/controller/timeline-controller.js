@@ -295,12 +295,12 @@ class TimelineController extends EventHandler {
               }
             });
             hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, {success: true, frag: frag});
-        },
-        function (e) {
-          // Something went wrong while parsing. Trigger event with success false.
-          logger.log(`Failed to parse VTT cue: ${e}`);
-          hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, {success: false, frag: frag});
-        });
+          },
+          function (e) {
+            // Something went wrong while parsing. Trigger event with success false.
+            logger.log(`Failed to parse VTT cue: ${e}`);
+            hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, {success: false, frag: frag});
+          });
       }
       else {
         // In case there is no payload, finish unsuccessfully.
