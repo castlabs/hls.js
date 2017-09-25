@@ -276,34 +276,8 @@ class TimelineController extends EventHandler {
         let textTracks = this.textTracks,
           hls = this.hls;
 
-        var header = String.fromCharCode.apply(null, new Uint8Array(payload).subarray(0,200));
-        var ExternalTtmlTextParser = window.shaka && window.shaka.media && window.shaka.media.TtmlTextParser;
-        if (header.indexOf('<?xml') === 0 && header.indexOf('<tt') > 0 && ExternalTtmlTextParser) {
-          var ttmlCues = [];
-          try {
-            ttmlCues = new ExternalTtmlTextParser().parseMedia(payload, {periodStart: frag.start}, [frag.baseurl]);
-            if (ttmlCues.length){
-              ttmlCues.forEach(function(cue){
-                const currentTrack = textTracks[frag.trackId];
-                try {
-                  currentTrack.addCue(cue);
-                } catch (err) {
-                  const textTrackCue = new window.TextTrackCue(cue.startTime, cue.endTime, cue.text);
-                  textTrackCue.id = cue.id;
-                  currentTrack.addCue(textTrackCue);
-                }
-              });
-            }
-            hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, {success: true, frag: frag});
-          }
-          catch(e){
-            // Something went wrong while parsing. Trigger event with success false.
-            logger.log(`Failed to parse TTML cue: ${e}`);
-            hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, {success: false, frag: frag});
-          }
-        } else {
-          // Parse the WebVTT file contents.
-          WebVTTParser.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
+        // Parse the WebVTT file contents.
+        WebVTTParser.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
             const currentTrack = textTracks[frag.trackId];
             // Add cues and trigger event with success true.
             cues.forEach(cue => {
@@ -327,7 +301,6 @@ class TimelineController extends EventHandler {
             logger.log(`Failed to parse VTT cue: ${e}`);
             hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, {success: false, frag: frag});
           });
-        }
       }
       else {
         // In case there is no payload, finish unsuccessfully.
