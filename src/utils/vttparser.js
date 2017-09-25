@@ -127,7 +127,7 @@ function parseOptions(input, callback, keyValueDelim, groupDelim) {
   }
 }
 
-var defaults = new VTTCue(0, 0, 0);
+var defaults = new VTTCue(0, 10000000, 0);
 // 'middle' was changed to 'center' in the spec: https://github.com/w3c/webvtt/pull/244
 //  Safari doesn't yet support this change, but FF and Chrome do.
 var center = defaults.align === 'middle' ? 'middle' : 'center';
@@ -343,7 +343,7 @@ VTTParser.prototype = {
             if (!line) {
               continue;
             }
-            self.cue = new VTTCue(0, 0, '');
+            self.cue = new VTTCue(0, 10000000, '');
             self.state = 'CUE';
             // 30-39 - Check if self line contains an optional identifier or timing data.
             if (line.indexOf('-->') === -1) {
