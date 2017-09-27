@@ -1286,7 +1286,7 @@ var AudioStreamController = function (_EventHandler) {
               trackId = this.trackId;
 
           // if buffer length is less than maxBufLen try to load a new fragment
-          if (bufferLen < maxBufLen && trackId < tracks.length) {
+          if ((bufferLen < maxBufLen || audioSwitch) && trackId < tracks.length) {
             trackDetails = tracks[trackId].details;
             // if track info not retrieved yet, switch state and wait for track retrieval
             if (typeof trackDetails === 'undefined') {
@@ -6993,7 +6993,7 @@ var Demuxer = function () {
       var discontinuity = !(lastFrag && frag.cc === lastFrag.cc);
       var trackSwitch = !(lastFrag && frag.level === lastFrag.level);
       var nextSN = lastFrag && frag.sn === lastFrag.sn + 1;
-      var contiguous = !discontinuity && !trackSwitch && nextSN;
+      var contiguous = !trackSwitch && nextSN;
       if (discontinuity) {
         _logger.logger.log(this.id + ':discontinuity detected');
       }
@@ -11300,7 +11300,8 @@ var MP4 = function () {
     key: 'mfhd',
     value: function mfhd(sequenceNumber) {
       return MP4.box(MP4.types.mfhd, new Uint8Array([0x00, 0x00, 0x00, 0x00, // flags
-      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]));
+      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]) // sequence_number
+      );
     }
   }, {
     key: 'minf',
@@ -11547,7 +11548,8 @@ var MP4 = function () {
           lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
       return MP4.box(MP4.types.traf, MP4.box(MP4.types.tfhd, new Uint8Array([0x00, // version 0
       0x00, 0x00, 0x00, // flags
-      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF])), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
+      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF]) // track_ID
+      ), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
       0x00, 0x00, 0x00, // flags
       upperWordBaseMediaDecodeTime >> 24, upperWordBaseMediaDecodeTime >> 16 & 0XFF, upperWordBaseMediaDecodeTime >> 8 & 0XFF, upperWordBaseMediaDecodeTime & 0xFF, lowerWordBaseMediaDecodeTime >> 24, lowerWordBaseMediaDecodeTime >> 16 & 0XFF, lowerWordBaseMediaDecodeTime >> 8 & 0XFF, lowerWordBaseMediaDecodeTime & 0xFF])), MP4.trun(track, sampleDependencyTable.length + 16 + // tfhd
       20 + // tfdt
@@ -15273,8 +15275,16 @@ var XhrLoader = function () {
       var stats = this.stats;
       stats.tfirst = 0;
       stats.loaded = 0;
-      if (this.xhrSetup) {
-        this.xhrSetup(xhr, context.url);
+      var xhrSetup = this.xhrSetup;
+      if (xhrSetup) {
+        try {
+          xhrSetup(xhr, context.url);
+        } catch (e) {
+          // fix xhrSetup: (xhr, url) => {xhr.setRequestHeader("Content-Language", "test");}
+          // not working, as xhr.setRequestHeader expects xhr.readyState === OPEN
+          xhr.open('GET', context.url, true);
+          xhrSetup(xhr, context.url);
+        }
       }
 
       if (!xhr.readyState) {
