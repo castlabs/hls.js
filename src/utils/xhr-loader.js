@@ -60,7 +60,9 @@ class XhrLoader {
     };
 
     if (context.rangeEnd) {
+      /*jshint -W069 */
       mutableContext.headers['Range'] = 'bytes=' + context.rangeStart + '-' + (context.rangeEnd - 1);
+      /*jshint +W069 */
     }
 
     try {
