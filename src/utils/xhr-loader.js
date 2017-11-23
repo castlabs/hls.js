@@ -48,8 +48,6 @@ class XhrLoader {
     stats.loaded = 0;
     const xhrSetup = this.xhrSetup;
 
-    xhr.responseType = context.responseType;
-
     const mutableContext = {
       xhr: xhr,
       method: 'GET',
@@ -83,6 +81,8 @@ class XhrLoader {
     });
 
     xhr.allowCrossSiteCredentials = mutableContext.allowCrossSiteCredentials;
+
+    xhr.responseType = context.responseType;
 
     xhr.onreadystatechange = this.readystatechange.bind(this);
     xhr.onprogress = this.loadprogress.bind(this);
