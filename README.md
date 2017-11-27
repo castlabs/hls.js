@@ -2,6 +2,7 @@ CHANGES FOR 0.8.2
 1. DE-2491 - adding whole data object to be send through event MANIFEST_PARSED. This is needed for selecting the preferred audio in advance
 2. DE-1017 - problem on IE and EDGE - subtitles weren't shown
 3. DE-1643 - adding external shaka ttml parser to hls
+1. DE-2499 - Fix setting URL and headers in network modifiers when HLS in use
 
 
 NOT NEEDED
