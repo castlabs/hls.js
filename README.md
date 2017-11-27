@@ -1,3 +1,16 @@
+CHANGES FOR 0.8.2
+1. DE-2491 - adding whole data object to be send through event MANIFEST_PARSED. This is needed for selecting the preferred audio in advance
+2. DE-1017 - problem on IE and EDGE - subtitles weren't shown
+3. DE-1643 - adding external shaka ttml parser to hls
+
+
+NOT NEEDED
+1. DE-1963 - Chromecast custom header bug - already fixed from public repo
+
+Last Updated 2017.11.20
+
+
+
 [![Build Status](https://travis-ci.org/video-dev/hls.js.svg?branch=master)](https://travis-ci.org/video-dev/hls.js)
 [![npm][npm-image]][npm-url]
 [![Greenkeeper badge](https://badges.greenkeeper.io/video-dev/hls.js.svg)](https://greenkeeper.io/)

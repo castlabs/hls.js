@@ -118,6 +118,7 @@ class LevelController extends EventHandler {
         }
       }
       this.hls.trigger(Event.MANIFEST_PARSED, {
+        data    : data,
         levels    : levels,
         firstLevel: this._firstLevel,
         stats     : data.stats,
