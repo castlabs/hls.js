@@ -10,6 +10,9 @@ class XhrLoader {
     if (config && config.xhrSetup) {
       this.xhrSetup = config.xhrSetup;
     }
+    if (config && config.xhrReady) {
+      this.xhrReady = config.xhrReady;
+    }
   }
 
   destroy() {
@@ -98,6 +101,7 @@ class XhrLoader {
         stats = this.stats,
         context = this.context,
         config = this.config;
+    var xhrReady = this.xhrReady;
 
     // don't proceed if xhr has been aborted
     if (stats.aborted) {
@@ -125,12 +129,24 @@ class XhrLoader {
             len = data.length;
           }
           stats.loaded = stats.total = len;
-          let response = { url : xhr.responseURL, data : data };
-          this.callbacks.onSuccess(response, stats, context, xhr);
+
+          const mutableContext =  {
+            xhr: xhr
+          };
+
+          if (typeof xhrReady === 'function') {
+            xhrReady(mutableContext);
+          }
+
+          this.callbacks.onSuccess({url: mutableContext.uri, data: mutableContext.data}, stats, context, xhr);
         } else {
             // if max nb of retries reached or if http status between 400 and 499 (such error cannot be recovered, retrying is useless), return error
           if (stats.retry >= config.maxRetry || (status >= 400 && status < 499)) {
             logger.error(`${status} while loading ${context.url}` );
+
+            // shaka doesn't trigger network modifiers when http error.
+            // replicate the same behaviour.
+
             this.callbacks.onError({ code : status, text : xhr.statusText}, context, xhr);
           } else {
             // retry
