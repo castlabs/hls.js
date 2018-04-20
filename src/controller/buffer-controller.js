@@ -445,7 +445,11 @@ class BufferController extends EventHandler {
               sb.ended = false;
               //logger.log(`appending ${segment.content} ${type} SB, size:${segment.data.length}, ${segment.parent}`);
               this.parent = segment.parent;
-              sb.appendBuffer(segment.data);
+              if (typeof sb.clppAppendBuffer === 'function') {
+                sb.clppAppendBuffer(this.hls.streamController.fragCurrent.level, this.hls.streamController.fragCurrent.start, segment.data);
+              } else {
+                sb.appendBuffer(segment.data);
+              }
               this.appendError = 0;
               this.appended++;
               this.appending = true;
