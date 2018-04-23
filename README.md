@@ -3,6 +3,7 @@ CHANGES FOR 0.8.2
 1. DE-1017 - problem on IE and EDGE - subtitles weren't shown
 1. DE-1643 - adding external shaka ttml parser to hls
 1. cl-DE-1216 - add xhrReady, interceptor allows to modify response before processing it 
+1. cl-DE-4047 - Trigger an event when video resolution changes (physical) 
 
 
 NOT NEEDED
