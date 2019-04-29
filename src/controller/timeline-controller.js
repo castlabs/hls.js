@@ -312,7 +312,7 @@ class TimelineController extends EventHandler {
         // WebVTTParser.parse is an async method and if the currently selected text track mode is set to "disabled"
         // before parsing is done then don't try to access currentTrack.cues.getCueById as cues will be null
         // and trying to access getCueById method of cues will throw an exception
-        if (currentTrack.mode === 'disabled') {
+        if (currentTrack.mode === 'disabled' || !currentTrack.cues) {
           hls.trigger(Event.SUBTITLE_FRAG_PROCESSED, { success: false, frag: frag });
           return;
         }
