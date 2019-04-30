@@ -1,3 +1,4 @@
+/* jshint ignore:start */
 import { getSelfScope } from './get-self-scope';
 
 function noop (...args) {}
@@ -74,3 +75,4 @@ export const enableLogs = function (debugConfig) {
 };
 
 export const logger = exportedLogger;
+/* jshint ignore:end */

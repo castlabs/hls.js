@@ -174,7 +174,7 @@ let specialCea608CharsCodes = {
     log: function (severity, msg) {
         let minLevel = this.verboseFilter[severity];
         if (this.verboseLevel >= minLevel) {
-        // console.log(this.time + ' [' + severity + '] ' + msg);
+            console.log(this.time + ' [' + severity + '] ' + msg);
         }
     }
     };

@@ -1,5 +1,16 @@
 import { getSelfScope } from '../utils/get-self-scope';
 
+let decoder;
+
+function getTextDecoder () {
+  const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
+  if (!decoder && typeof global.TextDecoder !== 'undefined') {
+    decoder = new global.TextDecoder('utf-8');
+  }
+
+  return decoder;
+}
+
 /**
  * ID3 parser
  */
@@ -347,17 +358,6 @@ class ID3 {
     }
     return out;
   }
-}
-
-let decoder;
-
-function getTextDecoder () {
-  const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
-  if (!decoder && typeof global.TextDecoder !== 'undefined') {
-    decoder = new global.TextDecoder('utf-8');
-  }
-
-  return decoder;
 }
 
 const utf8ArrayToStr = ID3._utf8ArrayToStr;
