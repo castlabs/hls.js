@@ -3,7 +3,14 @@ export function getSelfScope () {
     if (typeof window === 'undefined') {
       /* jshint ignore:start */
       /* eslint-disable-next-line no-undef */
-      return self;
+      if (typeof self !== 'undefined') {
+        return self;
+      } else {
+        // NOTE: mock console for internal hls.js tests
+        return {
+          console: {}
+        };
+      }
       /* jshint ignore:end */
     } else {
       return window;
