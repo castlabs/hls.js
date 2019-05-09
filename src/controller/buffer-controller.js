@@ -423,6 +423,46 @@ class BufferController extends EventHandler {
     }
   }
 
+  appendBuffer(sourceBuffer, data) {
+    if (typeof sourceBuffer.clppAppendBuffer === 'function') {
+      sourceBuffer.clppAppendBuffer(this.hls.streamController.fragCurrent.level, this.hls.streamController.fragCurrent.start, data);
+    } else {
+      sourceBuffer.appendBuffer(data);
+    }
+  }
+
+  // NOTE: ugly function test Aramnd's approach with predefined slice size
+  appendBufferInPieces(sourceBuffer, data) {
+    if (sourceBuffer.updating) {
+      return;
+    }
+    var pieces = new Array(new Uint8Array(data));
+    var self = this;
+    pieces.forEach(function(piece) {
+      try {
+        self.appendBuffer(sourceBuffer, piece.buffer);
+      } catch (err) {
+        if (err.name !== 'QuotaExceededError') {
+          throw err;
+        }
+        // Reduction schedule: 80%, 60%, 40%, 20%, 16%, 12%, 8%, 4%, fail.
+        var reduction = pieces[0].byteLength * 0.2;
+        if (reduction / data.byteLength < 0.04) {
+          throw new Error('MediaSource threw QuotaExceededError too many times');
+        }
+        var newPieces = [
+          pieces[0].slice(0, reduction),
+          pieces[0].slice(reduction, pieces[0].byteLength)
+        ];
+        pieces.splice(0, 1, newPieces[0], newPieces[1]);
+        logger.error('reduced size', reduction);
+        pieces.forEach(function(p) {
+          self.appendBuffer(sourceBuffer, p);
+        });
+      }
+    });
+  }
+
   doAppending() {
     var hls = this.hls, sourceBuffer = this.sourceBuffer, segments = this.segments;
     if (Object.keys(sourceBuffer).length) {
@@ -439,16 +479,17 @@ class BufferController extends EventHandler {
         let segment = segments.shift();
         try {
           let type = segment.type, sb = sourceBuffer[type];
+          logger.error(type);
           if(sb) {
             if(!sb.updating) {
               // reset sourceBuffer ended flag before appending segment
               sb.ended = false;
               //logger.log(`appending ${segment.content} ${type} SB, size:${segment.data.length}, ${segment.parent}`);
               this.parent = segment.parent;
-              if (typeof sb.clppAppendBuffer === 'function') {
-                sb.clppAppendBuffer(this.hls.streamController.fragCurrent.level, this.hls.streamController.fragCurrent.start, segment.data);
-              } else {
-                sb.appendBuffer(segment.data);
+              if (type === 'video') {
+                this.appendBufferInPieces(sb, segment.data);
+              } else { 
+                this.appendBuffer(sb, segment.data);
               }
               this.appendError = 0;
               this.appended++;
