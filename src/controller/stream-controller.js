@@ -318,6 +318,9 @@ class StreamController extends EventHandler {
     }
     if(frag) {
       this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
+      if (frag.type !== 'main') {
+        return;
+      }
 
       var fragmentIndex = fragments.indexOf(frag);
       var nextIndexes = [fragmentIndex + 1, fragmentIndex + 2, fragmentIndex + 3];
@@ -363,6 +366,7 @@ class StreamController extends EventHandler {
     frag.loader = undefined;
     frag.cachedData = payload;
     frag.cacheInProgress = false;
+    frag.cacheStats = stats;
   }
 
   loaderror(response, context, networkDetails=null) {
