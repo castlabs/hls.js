@@ -317,8 +317,8 @@ class StreamController extends EventHandler {
       frag = this._findFragment(start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails);
     }
     if(frag) {
-      this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
       if (frag.type !== 'main') {
+        this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
         return;
       }
 
@@ -356,6 +356,9 @@ class StreamController extends EventHandler {
 
         loader.load(loaderContext, loaderConfig, loaderCallbacks);
       });
+
+      frag.cacheInProgress = true;
+      this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
     }
     return;
   }
@@ -364,7 +367,7 @@ class StreamController extends EventHandler {
     let payload = response.data, frag = context.frag;
     // detach fragment loader on load success
     frag.loader = undefined;
-    frag.cachedData = payload;
+    frag.cachedData = 1;//payload;
     frag.cacheInProgress = false;
     frag.cacheStats = stats;
   }
