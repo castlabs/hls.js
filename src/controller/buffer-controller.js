@@ -200,6 +200,7 @@ class BufferController extends EventHandler {
     if (this._needsEos) {
       this.checkEos();
     }
+
     this.appending = false;
     let parent = this.parent;
     // count nb of pending segments waiting for appending on this sourcebuffer
@@ -281,11 +282,32 @@ class BufferController extends EventHandler {
 
   onBufferAppending(data) {
     if (!this._needsFlush) {
-      if (!this.segments) {
-        this.segments = [ data ];
-      } else {
-        this.segments.push(data);
+      var type = data.type;
+
+      var packetizedProcessing = false;
+      if (type === 'video') {
+        var maxUnitSize = this.hls.config.mediaSource.maxAppendUnit;
+        var dataLength = data.data.byteLength;
+
+        if (dataLength > maxUnitSize) {
+          var packets = this.packetize_(data, maxUnitSize);
+          if (!this.segments) {
+            this.segments = packets;
+          } else {
+            this.segments = this.segments.concat(packets);
+          }
+          packetizedProcessing = true;
+        }
       }
+
+      if (!packetizedProcessing) {
+        if (!this.segments) {
+          this.segments = [ data ];
+        } else {
+          this.segments.push(data);
+        }
+      }
+      
       this.doAppending();
     }
   }
@@ -338,8 +360,7 @@ class BufferController extends EventHandler {
       logger.warn('exception while calling mediaSource.endOfStream()');
     }
     this._needsEos = false;
- }
-
+  }
 
   onBufferFlushing(data) {
     this.flushRange.push({start: data.startOffset, end: data.endOffset, type : data.type});
@@ -431,48 +452,59 @@ class BufferController extends EventHandler {
     }
   }
 
-  // NOTE: ugly function, test Aramnd's approach with predefined slice size
-  appendBufferInPackets(sourceBuffer, data, mediaSource) {
-    if (sourceBuffer.updating) {
-      return;
+  /**
+   * Slice large segments into smaller units of data.
+   *
+   * @description
+   * When streaming devices with a small source buffer size, segments of
+   * high-quality representations can easily lead quota exceeded errors
+   * (due to their large size). In such case, the current strategy of
+   * reducing buffering goal doesn't help. An efficient way to mitigate the
+   * aforementioned issue is to slice a large segment into smaller fragments and
+   * thus push manageable amount of data into the source buffer.
+   *
+   * @see https://developers.google.com/web/updates/2017/10/quotaexceedederror
+   *
+   * @param {!ArrayBuffer} data
+   * @param {number} size
+   * @returns {!Array.<!ArrayBuffer>}
+   * @private
+   */
+  packetize_(data, size) {
+    var dataSize = data.data.byteLength;
+    var packetSize = size;
+    var units = Math.ceil(dataSize / packetSize);
+    var packets = [];
+
+    for (var i = 0; i < units; i++) {
+      var start = i * size;
+      var end = Math.min((start + size), dataSize);
+      var length = end - start;
+      var packet = new Uint8Array(data.data.buffer, start, length);
+
+      packet = new Uint8Array(packet);
+      var packetData = {
+        data: packet,
+        content: data.content,
+        parent: data.parent,
+        type: data.type
+      };
+      packets.push(packetData);
+
+      logger.debug(
+          'MediaSourceEngine Packet #' + (i + 1) + ' : ' +
+          packetData.data.buffer.byteLength + ' bytes');
     }
 
-    console.log(mediaSource);
-    /*
-    appendDelay: 0
-    maxAppendAttempts: 1
-    maxAppendUnit: Infinity
-    */
-
-    var pieces = new Array(new Uint8Array(data));
-    var self = this;
-    pieces.forEach(function(piece) {
-      try {
-        self.appendBuffer(sourceBuffer, piece.buffer);
-      } catch (err) {
-        if (err.name !== 'QuotaExceededError') {
-          throw err;
-        }
-        // Reduction schedule: 80%, 60%, 40%, 20%, 16%, 12%, 8%, 4%, fail.
-        var reduction = pieces[0].byteLength * 0.8;
-        if (reduction / data.byteLength < 0.04) {
-          throw new Error('MediaSource threw QuotaExceededError too many times');
-        }
-        var newPieces = [
-          pieces[0].slice(0, reduction),
-          pieces[0].slice(reduction, pieces[0].byteLength)
-        ];
-        pieces.splice(0, 1, newPieces[0], newPieces[1]);
-        logger.error('reduced size', reduction);
-        pieces.forEach(function(p) {
-          self.appendBuffer(sourceBuffer, p);
-        });
-      }
-    });
+    return packets;
   }
 
   doAppending() {
     var hls = this.hls, sourceBuffer = this.sourceBuffer, segments = this.segments;
+    var maxAppendAttempts = this.hls.config.mediaSource.maxAppendAttempts;
+    if (maxAppendAttempts !== 'undefined') {
+      hls.config.appendErrorMaxRetry = maxAppendAttempts;
+    }
 
     if (Object.keys(sourceBuffer).length) {
       if (this.media.error) {
@@ -480,7 +512,7 @@ class BufferController extends EventHandler {
         logger.error('trying to append although a media error occured, flush segment and abort');
         return;
       }
-      if (this.appending) {
+      if (this.appending/* || this._appendingPackets*/) {
         //logger.log(`sb appending in progress`);
         return;
       }
@@ -494,11 +526,12 @@ class BufferController extends EventHandler {
               sb.ended = false;
               //logger.log(`appending ${segment.content} ${type} SB, size:${segment.data.length}, ${segment.parent}`);
               this.parent = segment.parent;
-              if (type === 'video' && hls.config.mediaSource !== 'undefined') {
-                this.appendBufferInPackets(sb, segment.data, hls.config.mediaSource);
-              } else {
-                this.appendBuffer(sb, segment.data);
-              }
+              var appendDelaySec = this.hls.config.mediaSource.appendDelay;
+              var self = this;
+              setTimeout(function () {
+                self.appendBuffer(sb, segment.data);
+              }, appendDelaySec * 1000);
+              
               this.appendError = 0;
               this.appended++;
               this.appending = true;
@@ -540,6 +573,8 @@ class BufferController extends EventHandler {
             // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
             // let's stop appending any segments, and report BUFFER_FULL_ERROR error
             this.segments = [];
+            // Reduction schedule: 80%, 60%, 40%, 20%, 16%, 12%, 8%, 4%, fail.
+            this.hls.config.mediaSource.maxAppendUnit = 0.8 * this.hls.config.mediaSource.maxAppendUnit;
             event.details = ErrorDetails.BUFFER_FULL_ERROR;
             event.fatal = false;
             hls.trigger(Event.ERROR,event);
