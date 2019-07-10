@@ -52,7 +52,6 @@ class Fragment {
 
     this.cachedData = null;
     this.cacheInProgress = false;
-    this.cacheStats = null;
   }
 
   get url() {

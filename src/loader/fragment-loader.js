@@ -49,16 +49,16 @@ class FragmentLoader extends EventHandler {
     loaderConfig = { timeout : config.fragLoadingTimeOut, maxRetry : 0 , retryDelay : 0, maxRetryDelay : config.fragLoadingMaxRetryTimeout};
     loaderCallbacks = { onSuccess : this.loadsuccess.bind(this), onError :this.loaderror.bind(this), onTimeout : this.loadtimeout.bind(this), onProgress: this.loadprogress.bind(this)};
     
-    //if (frag.cachedData === null) {
+    if (frag.cachedData === null) {
       loader.load(loaderContext,loaderConfig,loaderCallbacks);
-    /*
     } else {
-      console.log('--- trying from cache');
-      console.log(frag);
-      this.hls.trigger(Event.FRAG_LOADED, {payload: frag.cachedData, frag: frag, stats: frag.cacheStats, networkDetails: null});
+      console.log('trying from cache');
+      var response = {
+        data: frag.cachedData
+      };
       frag.cachedData = null;
+      loadsuccess(response, null, loaderContext, null);
     }
-    */
   }
 
   loadsuccess(response, stats, context, networkDetails=null) {
