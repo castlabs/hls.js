@@ -316,9 +316,6 @@ class StreamController extends EventHandler {
       frag = this._findFragment(start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails);
     }
     if(frag) {
-      console.log(frag);
-      console.log(level);
-      console.log(levelDetails);
       this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
     }
     return;
