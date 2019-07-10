@@ -432,18 +432,10 @@ class BufferController extends EventHandler {
   }
 
   // NOTE: ugly function, test Aramnd's approach with predefined slice size
-  appendBufferInPackets(sourceBuffer, data, mediaSource) {
+  appendBufferInPackets(sourceBuffer, data) {
     if (sourceBuffer.updating) {
       return;
     }
-
-    console.log(mediaSource);
-    /*
-    appendDelay: 0
-    maxAppendAttempts: 1
-    maxAppendUnit: Infinity
-    */
-
     var pieces = new Array(new Uint8Array(data));
     var self = this;
     pieces.forEach(function(piece) {
@@ -454,7 +446,7 @@ class BufferController extends EventHandler {
           throw err;
         }
         // Reduction schedule: 80%, 60%, 40%, 20%, 16%, 12%, 8%, 4%, fail.
-        var reduction = pieces[0].byteLength * 0.8;
+        var reduction = pieces[0].byteLength * 0.4;
         if (reduction / data.byteLength < 0.04) {
           throw new Error('MediaSource threw QuotaExceededError too many times');
         }
@@ -473,7 +465,6 @@ class BufferController extends EventHandler {
 
   doAppending() {
     var hls = this.hls, sourceBuffer = this.sourceBuffer, segments = this.segments;
-
     if (Object.keys(sourceBuffer).length) {
       if (this.media.error) {
         this.segments = [];
@@ -494,8 +485,8 @@ class BufferController extends EventHandler {
               sb.ended = false;
               //logger.log(`appending ${segment.content} ${type} SB, size:${segment.data.length}, ${segment.parent}`);
               this.parent = segment.parent;
-              if (type === 'video' && hls.config.mediaSource !== 'undefined') {
-                this.appendBufferInPackets(sb, segment.data, hls.config.mediaSource);
+              if (type === 'video') {
+                this.appendBufferInPackets(sb, segment.data);
               } else {
                 this.appendBuffer(sb, segment.data);
               }
