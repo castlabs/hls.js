@@ -11,6 +11,7 @@ import * as LevelHelper from '../helper/level-helper';import TimeRanges from '..
 import {ErrorTypes, ErrorDetails} from '../errors';
 import {logger} from '../utils/logger';
 import { alignDiscontinuities } from '../utils/discontinuities';
+import XhrLoader from '../utils/xhr-loader';
 
 
 const State = {
@@ -316,9 +317,87 @@ class StreamController extends EventHandler {
       frag = this._findFragment(start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails);
     }
     if(frag) {
+      if (frag.type !== 'main') {
+        this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
+        return;
+      }
+
+      var fragmentIndex = fragments.indexOf(frag);
+      var nextIndexes = [fragmentIndex + 1, fragmentIndex + 2, fragmentIndex + 3];
+      var self = this;
+      nextIndexes.forEach(function (value, index) {
+        var f = fragments[value];
+        if(typeof fragments[value] === 'undefined') {
+          return;
+        }
+
+        if (f.cachedData !== null || f.cacheInProgress === true) {
+          return;
+        }
+
+        console.log('--- download fragment:');
+        console.log(f);
+
+        f.cacheInProgress = true;
+        var loader = new XhrLoader();
+        let loaderContext, loaderConfig, loaderCallbacks;
+
+        loaderContext = { url : f.url, frag : f, responseType : 'arraybuffer', progressData : false};
+        let start = f.byteRangeStartOffset, end = f.byteRangeEndOffset;
+        if (!isNaN(start) && !isNaN(end)) {
+          loaderContext.rangeStart = start;
+          loaderContext.rangeEnd = end;
+        }
+
+        let config = self.hls.config;
+        loaderConfig = { timeout : config.fragLoadingTimeOut, maxRetry : 0 , retryDelay : 0, maxRetryDelay : config.fragLoadingMaxRetryTimeout};
+
+        loaderCallbacks = { onSuccess : self.loadsuccess.bind(self), onError :self.loaderror.bind(self), onTimeout : self.loadtimeout.bind(self), onProgress: self.loadprogress.bind(self)};
+
+        loader.load(loaderContext, loaderConfig, loaderCallbacks);
+      });
+
+      frag.cacheInProgress = true;
       this._loadFragmentOrKey(frag, level, levelDetails, pos, bufferEnd);
     }
     return;
+  }
+
+  loadsuccess(response, stats, context, networkDetails=null) {
+    let payload = response.data, frag = context.frag;
+    // detach fragment loader on load success
+    frag.loader = undefined;
+    frag.cachedData = 1;//payload;
+    frag.cacheInProgress = false;
+    frag.cacheStats = stats;
+  }
+
+  loaderror(response, context, networkDetails=null) {
+    let frag = context.frag;
+    frag.cachedData = null;
+    frag.cacheInProgress = false;
+
+    let loader = context.loader;
+    if (loader) {
+      loader.abort();
+    }
+  }
+
+  loadtimeout(stats, context, networkDetails=null) {
+    let frag = context.frag;
+    frag.cachedData = null;
+    frag.cacheInProgress = false;
+
+    let loader = context.loader;
+    if (loader) {
+      loader.abort();
+    }
+  }
+
+  // data will be used for progressive parsing
+  loadprogress(stats, context, data, networkDetails=null) { // jshint ignore:line
+    let frag = context.frag;
+    frag.loaded = stats.loaded;
   }
 
   _ensureFragmentAtLivePoint(levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen) {
