@@ -49,6 +49,10 @@ class Fragment {
     this._byteRange = null;
     this._decryptdata = null;
     this.tagList = [];
+
+    this.cachedData = null;
+    this.cacheInProgress = false;
+    this.cacheStats = null;
   }
 
   get url() {
