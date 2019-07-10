@@ -431,7 +431,7 @@ class BufferController extends EventHandler {
     }
   }
 
-  // NOTE: ugly function, test Aramnd's approach with predefined slice size
+  // NOTE: ugly function test Aramnd's approach with predefined slice size
   appendBufferInPieces(sourceBuffer, data) {
     if (sourceBuffer.updating) {
       return;
