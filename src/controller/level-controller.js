@@ -101,6 +101,59 @@ class LevelController extends EventHandler {
       return (!audioCodec || isCodecSupportedInMp4(audioCodec)) && (!videoCodec || isCodecSupportedInMp4(videoCodec));
     });
 
+    var isChromecast = navigator.userAgent.indexOf('CrKey') >= 0;
+    if (isChromecast) {
+      var restrictions = this.hls.config.chromecast.restrictions;
+
+      if (typeof restrictions !== 'undefined' && restrictions !== null && Array.isArray(restrictions)) {
+        var deviceIsUltra = false;
+        // NOTE: 4k is supported by the display and Chromecast
+        //       it does not filter solo Chromecast, so combination
+        //       of not-4k display and Chromecast Ultra will return false
+        if (cast['__platform__'] && cast['__platform__'].canDisplayType(
+            'video/mp4; codecs="avc1.640028"; width=3840; height=2160')) {
+          deviceIsUltra = true;
+        }
+    
+        levels = levels.filter(function (track) {
+          var i;
+          for (i = 0; i < restrictions.length; i++) {
+            var restr = restrictions[i];
+            var ultra = restr.includeUltra;
+            if (typeof restr.includeUltra === 'undefined') {
+              ultra = true;
+            }
+            if (ultra === false && deviceIsUltra === true) {
+              return true;
+            }
+    
+            var codec = restr.unwantedCodec;
+            var bitrate = restr.maxBitrate;
+            var restricted = false;
+    
+            var trackCodec = track.videoCodec;
+            if (typeof codec !== 'undefined' && typeof bitrate !== 'undefined') {
+              if (codec === trackCodec && track.bitrate > bitrate) {
+                restricted = true;
+              }
+            } else if (typeof codec !== 'undefined' && codec === trackCodec) {
+              restricted = true;
+            } else if (typeof bitrate !== 'undefined' && track.bitrate > bitrate) {
+              restricted = true;
+            }
+    
+            if (restricted) {
+              return false;
+            }
+    
+            return true;
+          }
+    
+          return true;
+        });
+      }
+    }
+
     if (levels.length > 0) {
       // start bitrate is the first bitrate of the manifest
       bitrateStart = levels[0].bitrate;
