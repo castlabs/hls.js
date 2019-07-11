@@ -1,6 +1,7 @@
 /*
  * Level Controller
 */
+/*globals cast:false */
 
 import Event from '../events';
 import EventHandler from '../event-handler';
@@ -110,6 +111,7 @@ class LevelController extends EventHandler {
         // NOTE: 4k is supported by the display and Chromecast
         //       it does not filter solo Chromecast, so combination
         //       of not-4k display and Chromecast Ultra will return false
+        /* jshint -W069 */
         if (cast['__platform__'] && cast['__platform__'].canDisplayType(
             'video/mp4; codecs="avc1.640028"; width=3840; height=2160')) {
           deviceIsUltra = true;
