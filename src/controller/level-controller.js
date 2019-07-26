@@ -341,7 +341,8 @@ class LevelController extends EventHandler {
         // decrement reloadInterval with level loading delay
         reloadInterval -= performance.now() - data.stats.trequest;
         // in any case, don't reload more than every second
-        reloadInterval = Math.max(1000, Math.round(reloadInterval));
+        let minRefreshInterval = this.hls.config.manifestLoadingMaxRefresh;
+        reloadInterval = Math.max(minRefreshInterval, Math.round(reloadInterval));
         logger.log(`live playlist, reload in ${reloadInterval} ms`);
         this.timer = setTimeout(() => this.tick(), reloadInterval);
       } else {

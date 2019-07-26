@@ -81,12 +81,28 @@ class AudioTrackController extends EventHandler {
   onAudioTrackLoaded(data) {
     if (data.id < this.tracks.length) {
       logger.log(`audioTrack ${data.id} loaded`);
+      let curLevel = this.tracks[data.id];
       this.tracks[data.id].details = data.details;
       // check if current playlist is a live playlist
       if (data.details.live && !this.timer) {
         // if live playlist we will have to reload it periodically
         // set reload period to playlist target duration
-        this.timer = setInterval(this.ontick, 1000 * data.details.targetduration);
+        let newDetails = data.details;
+        let reloadInterval = 1000 * ( newDetails.averagetargetduration ? newDetails.averagetargetduration : newDetails.targetduration),
+            curDetails     = curLevel.details;
+        if (curDetails && newDetails.endSN === curDetails.endSN) {
+          // follow HLS Spec, If the client reloads a Playlist file and finds that it has not
+          // changed then it MUST wait for a period of one-half the target
+          // duration before retrying.
+          reloadInterval /= 2;
+          logger.log(`same live playlist, reload twice faster`);
+        }
+
+        reloadInterval -= performance.now() - data.stats.trequest;
+        // in any case, don't reload more than manifest loading refresh interval
+        let minRefreshInterval = this.hls.config.manifestLoadingMaxRefresh;
+        reloadInterval = Math.max(minRefreshInterval, Math.round(reloadInterval));
+        this.timer = setInterval(this.ontick, reloadInterval);
       }
       if (!data.details.live && this.timer) {
         // playlist is not live and timer is armed : stopping it
