@@ -103,7 +103,7 @@ class LevelController extends EventHandler {
     });
 
     var isChromecast = navigator.userAgent.indexOf('CrKey') >= 0;
-    if (isChromecast) {
+    if (isChromecast && this.hls.config.chromecast) {
       var restrictions = this.hls.config.chromecast.restrictions;
 
       if (typeof restrictions !== 'undefined' && restrictions !== null && Array.isArray(restrictions)) {
