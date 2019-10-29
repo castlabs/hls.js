@@ -255,6 +255,7 @@ class PlaylistLoader extends EventHandler {
       }
       level.bitrate = attrs.decimalInteger('AVERAGE-BANDWIDTH') || attrs.decimalInteger('BANDWIDTH');
       level.name = attrs.NAME;
+      level.frameRate = attrs.decimalInteger('FRAME-RATE');
 
       setCodecs([].concat((attrs.CODECS || '').split(/[ ,]+/)), level);
 
