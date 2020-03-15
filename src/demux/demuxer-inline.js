@@ -66,12 +66,12 @@ class DemuxerInline {
       const observer = this.observer;
       const typeSupported = this.typeSupported;
       const config = this.config;
-      // probing order is TS/AAC/MP3/MP4
+      // probing order is TS/MP4/AAC/MP3
       const muxConfig = [
         { demux: TSDemuxer, remux: MP4Remuxer },
+        { demux: MP4Demuxer, remux: PassThroughRemuxer },
         { demux: AACDemuxer, remux: MP4Remuxer },
-        { demux: MP3Demuxer, remux: MP4Remuxer },
-        { demux: MP4Demuxer, remux: PassThroughRemuxer }
+        { demux: MP3Demuxer, remux: MP4Remuxer }
       ];
 
       // probe for content type
